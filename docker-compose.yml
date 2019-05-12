@@ -1,0 +1,102 @@
+version: '3'
+services:
+  local_postgresql:
+    image: postgres
+    container_name: local_postgresql
+    ports:
+      - 5432:5432
+    networks:
+      - infrastructurenet
+    volumes:
+      - /Users/kchen/Documents/data/postgresql/data:/var/lib/postgresql/data
+      - /Users/kchen/Documents/data/postgresql/multiple-databases:/docker-entrypoint-initdb.d
+    environment:
+      # - POSTGRES_DB=infrastructure
+      - POSTGRES_MULTIPLE_DATABASES=sonar,artifactory,gitlab
+      # The following must match the DB_USER and DB_PASSWORD values passed to Artifactory
+      - POSTGRES_USER=infrastructure
+      - POSTGRES_PASSWORD=password
+    restart: always
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 32000
+        hard: 40000
+
+  local_artifactory:
+    image: docker.bintray.io/jfrog/artifactory-oss:latest
+    container_name: local_artifactory
+    ports:
+      - 9081:8081
+    networks:
+      - infrastructurenet
+    depends_on:
+      - local_postgresql
+    volumes:
+      - /Users/kchen/Documents/data/artifactory:/var/opt/jfrog/artifactory
+    environment:
+      - DB_TYPE=postgresql
+      # The following must match the POSTGRES_USER and POSTGRES_PASSWORD values passed to PostgreSQL
+      - DB_URL=jdbc:postgresql://local_postgresql:5432/artifactory
+      - DB_USER=artifactory
+      - DB_PASSWORD=password
+      # Add extra Java options by uncommenting the following line
+      #- EXTRA_JAVA_OPTIONS=-Xmx4g
+    restart: always
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 32000
+        hard: 40000
+
+  local_sonarqube:
+    image: sonarqube
+    container_name: local_sonarqube
+    ports:
+      - "9000:9000"
+    networks:
+      - infrastructurenet
+    depends_on:
+      - local_postgresql
+    volumes:
+      - /Users/kchen/Documents/data/sonarqube/conf:/opt/sonarqube/conf
+      - /Users/kchen/Documents/data/sonarqube/data:/opt/sonarqube/data
+      - /Users/kchen/Documents/data/sonarqube/logs:/opt/sonarqube/logs
+      - /Users/kchen/Documents/data/sonarqube/extensions:/opt/sonarqubeextensions
+    environment:
+      - sonar.jdbc.url=jdbc:postgresql://local_postgresql:5432/sonar
+      - sonar.jdbc.username=sonar
+      - sonar.jdbc.password=password
+    restart: always 
+
+  local_jenkins:
+    image: jenkins/jenkins:lts
+    container_name: local_jenkins
+    ports:
+      - "50000:50000"
+      - "9080:8080"
+    volumes:
+      - /Users/kchen/Documents/data/jenkins:/var/jenkins_home
+    environment:
+      JAVA_OPTS: "-Djava.awt.headless=true -Dmail.smtp.starttls.enable=true"
+    restart: always
+
+  local_gitlab:
+    image: 'gitlab/gitlab-ce:latest'
+    container_name: local_gitlab
+    ports:
+      - '9082:80'
+      - '2022:22'
+    # environment:
+    #   GITLAB_OMNIBUS_CONFIG: |
+    #     external_url 'https://gitlab.example.com'
+        # Add any other gitlab.rb configuration here, each on its own line
+    restart: always
+    volumes:
+      - /Users/kchen/Documents/data/gitlab/config:/etc/gitlab
+      - /Users/kchen/Documents/data/gitlab/logs:/var/log/gitlab
+      - /Users/kchen/Documents/data/gitlab/data:/var/opt/gitlab
+
+networks:
+  infrastructurenet:
+    driver: bridge
