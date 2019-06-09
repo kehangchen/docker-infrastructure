@@ -87,9 +87,21 @@ services:
     ports:
       - '9082:80'
       - '2022:22'
+    # networks:
+    #   - infrastructurenet
     # environment:
     #   GITLAB_OMNIBUS_CONFIG: |
-    #     external_url 'https://gitlab.example.com'
+    #     # Disable the built-in Postgres
+    #     postgresql['enable'] = false
+    #     # Fill in the connection details for database.yml
+    #     gitlab_rails['db_adapter'] = 'postgresql'
+    #     gitlab_rails['db_encoding'] = 'utf8'
+    #     gitlab_rails['db_host'] = 'local_postgresql'
+    #     gitlab_rails['db_database'] = 'gitlab'
+    #     gitlab_rails['db_port'] = 5432
+    #     gitlab_rails['db_username'] = 'gitlab'
+    #     gitlab_rails['db_password'] = 'password'
+        # external_url 'https://gitlab.example.com'
         # Add any other gitlab.rb configuration here, each on its own line
     restart: always
     volumes:

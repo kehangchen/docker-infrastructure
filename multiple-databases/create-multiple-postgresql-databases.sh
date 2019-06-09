@@ -10,6 +10,7 @@ function create_user_and_database() {
 	    CREATE USER $database WITH ENCRYPTED PASSWORD '$POSTGRES_PASSWORD';
 	    CREATE DATABASE $database;
 	    GRANT ALL PRIVILEGES ON DATABASE $database TO $database;
+        CREATE EXTENSION pg_trgm;
 EOSQL
 }
 
