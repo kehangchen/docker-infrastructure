@@ -2,17 +2,15 @@ version: '3'
 services:
   local_postgresql:
     image: postgres
-    container_name: local_postgresql
+    container_name: ${instance_prefix}_postgresql
     ports:
       - 5432:5432
     networks:
       - infrastructurenet
     volumes:
-      - /Users/kchen/Documents/data/postgresql/data:/var/lib/postgresql/data
-      # - /Users/kchen/Documents/data/postgresql/multiple-databases:/docker-entrypoint-initdb.d
+      - ${infrastructure_home}/postgresql/data:/var/lib/postgresql/data
       - ./multiple-databases/create-multiple-postgresql-databases.sh:/docker-entrypoint-initdb.d/create-multiple-postgresql-databases.sh
     environment:
-      # - POSTGRES_DB=infrastructure
       - POSTGRES_MULTIPLE_DATABASES=sonar,artifactory,gitlab
       # The following must match the DB_USER and DB_PASSWORD values passed to Artifactory
       - POSTGRES_USER=infrastructure
@@ -26,20 +24,20 @@ services:
 
   local_artifactory:
     image: docker.bintray.io/jfrog/artifactory-oss:latest
-    container_name: local_artifactory
+    container_name: ${instance_prefix}_artifactory
     ports:
       - 9081:8081
     networks:
       - infrastructurenet
     depends_on:
-      - local_postgresql
+      - ${instance_prefix}_postgresql
     volumes:
-      - /Users/kchen/Documents/data/artifactory:/var/opt/jfrog/artifactory
+      - ${infrastructure_home}/artifactory:/var/opt/jfrog/artifactory
       - ./database-properties/db.properties:/var/opt/jfrog/artifactory/etc/db.properties
     environment:
       - DB_TYPE=postgresql
       # The following must match the POSTGRES_USER and POSTGRES_PASSWORD values passed to PostgreSQL
-      - DB_URL=jdbc:postgresql://local_postgresql:5432/artifactory
+      - DB_URL=jdbc:postgresql://${instance_prefix}_postgresql:5432/artifactory
       - DB_USER=artifactory
       - DB_PASSWORD=password
       # Add extra Java options by uncommenting the following line
@@ -53,18 +51,18 @@ services:
 
   local_sonarqube:
     image: sonarqube
-    container_name: local_sonarqube
+    container_name: ${instance_prefix}_sonarqube
     ports:
       - "9000:9000"
     networks:
       - infrastructurenet
     depends_on:
-      - local_postgresql
+      - ${instance_prefix}_postgresql
     volumes:
-      - /Users/kchen/Documents/data/sonarqube/conf:/opt/sonarqube/conf
-      - /Users/kchen/Documents/data/sonarqube/data:/opt/sonarqube/data
-      - /Users/kchen/Documents/data/sonarqube/logs:/opt/sonarqube/logs
-      - /Users/kchen/Documents/data/sonarqube/extensions:/opt/sonarqubeextensions
+      - ${infrastructure_home}/sonarqube/conf:/opt/sonarqube/conf
+      - ${infrastructure_home}/sonarqube/data:/opt/sonarqube/data
+      - ${infrastructure_home}/sonarqube/logs:/opt/sonarqube/logs
+      - ${infrastructure_home}/sonarqube/extensions:/opt/sonarqube/extensions
     environment:
       - sonar.jdbc.url=jdbc:postgresql://local_postgresql:5432/sonar
       - sonar.jdbc.username=sonar
@@ -73,19 +71,19 @@ services:
 
   local_jenkins:
     image: jenkins/jenkins:lts
-    container_name: local_jenkins
+    container_name: ${instance_prefix}_jenkins
     ports:
       - "50000:50000"
       - "9080:8080"
     volumes:
-      - /Users/kchen/Documents/data/jenkins:/var/jenkins_home
+      - ${infrastructure_home}/jenkins:/var/jenkins_home
     environment:
       JAVA_OPTS: "-Djava.awt.headless=true -Dmail.smtp.starttls.enable=true"
     restart: always
 
   local_gitlab:
     image: 'gitlab/gitlab-ce:latest'
-    container_name: local_gitlab
+    container_name: ${instance_prefix}_gitlab
     ports:
       - '9082:80'
       - '2022:22'
@@ -98,7 +96,7 @@ services:
         # Fill in the connection details for database.yml
         gitlab_rails['db_adapter'] = 'postgresql'
         gitlab_rails['db_encoding'] = 'utf8'
-        gitlab_rails['db_host'] = 'local_postgresql'
+        gitlab_rails['db_host'] = '${instance_prefix}_postgresql'
         gitlab_rails['db_database'] = 'gitlab'
         gitlab_rails['db_port'] = 5432
         gitlab_rails['db_username'] = 'gitlab'
@@ -107,9 +105,9 @@ services:
         # Add any other gitlab.rb configuration here, each on its own line
     restart: always
     volumes:
-      - /Users/kchen/Documents/data/gitlab/config:/etc/gitlab
-      - /Users/kchen/Documents/data/gitlab/logs:/var/log/gitlab
-      - /Users/kchen/Documents/data/gitlab/data:/var/opt/gitlab
+      - ${infrastructure_home}/gitlab/config:/etc/gitlab
+      - ${infrastructure_home}/gitlab/logs:/var/log/gitlab
+      - ${infrastructure_home}/gitlab/data:/var/opt/gitlab
 
 networks:
   infrastructurenet:
