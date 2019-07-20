@@ -1,5 +1,29 @@
 version: '3'
 services:
+  local_visualizer:
+    image: dockersamples/visualizer
+    container_name: ${instance_prefix}_visualizer
+    ports:
+      - "9086:8080"
+    stop_grace_period: 1m30s
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+
+  local_registry:
+    image: registry
+    container_name: ${instance_prefix}_registry
+    ports:
+      - "9084:5000"
+    volumes:
+      - ${infrastructure_home}/registry:/var/lib/registry
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    restart: always
+
   local_postgresql:
     image: postgres
     container_name: ${instance_prefix}_postgresql
