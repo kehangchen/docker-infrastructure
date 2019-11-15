@@ -2,7 +2,7 @@ version: '3'
 services:
   local_visualizer:
     image: dockersamples/visualizer
-    container_name: ${instance_prefix}_visualizer
+    container_name: local_visualizer
     ports:
       - "9086:8080"
     stop_grace_period: 1m30s
@@ -14,11 +14,11 @@ services:
 
   local_registry:
     image: registry
-    container_name: ${instance_prefix}_registry
+    container_name: local_registry
     ports:
       - "9084:5000"
     volumes:
-      - ${infrastructure_home}/registry:/var/lib/registry
+      - /Users/kchen/Documents/data/registry:/var/lib/registry
     deploy:
       placement:
         constraints: [node.role == manager]
@@ -26,13 +26,13 @@ services:
 
   local_postgresql:
     image: postgres
-    container_name: ${instance_prefix}_postgresql
+    container_name: local_postgresql
     ports:
       - 5432:5432
     networks:
       - infrastructurenet
     volumes:
-      - ${infrastructure_home}/postgresql/data:/var/lib/postgresql/data
+      - /Users/kchen/Documents/data/postgresql/data:/var/lib/postgresql/data
       - ./multiple-databases/create-multiple-postgresql-databases.sh:/docker-entrypoint-initdb.d/create-multiple-postgresql-databases.sh
     environment:
       - POSTGRES_MULTIPLE_DATABASES=sonar,artifactory,gitlab
@@ -48,20 +48,20 @@ services:
 
   local_artifactory:
     image: docker.bintray.io/jfrog/artifactory-oss:latest
-    container_name: ${instance_prefix}_artifactory
+    container_name: local_artifactory
     ports:
       - 9081:8081
     networks:
       - infrastructurenet
     depends_on:
-      - ${instance_prefix}_postgresql
+      - local_postgresql
     volumes:
-      - ${infrastructure_home}/artifactory:/var/opt/jfrog/artifactory
+      - /Users/kchen/Documents/data/artifactory:/var/opt/jfrog/artifactory
       - ./database-properties/db.properties:/var/opt/jfrog/artifactory/etc/db.properties
     environment:
       - DB_TYPE=postgresql
       # The following must match the POSTGRES_USER and POSTGRES_PASSWORD values passed to PostgreSQL
-      - DB_URL=jdbc:postgresql://${instance_prefix}_postgresql:5432/artifactory
+      - DB_URL=jdbc:postgresql://local_postgresql:5432/artifactory
       - DB_USER=artifactory
       - DB_PASSWORD=password
       # Add extra Java options by uncommenting the following line
@@ -75,18 +75,18 @@ services:
 
   local_sonarqube:
     image: sonarqube
-    container_name: ${instance_prefix}_sonarqube
+    container_name: local_sonarqube
     ports:
       - "9000:9000"
     networks:
       - infrastructurenet
     depends_on:
-      - ${instance_prefix}_postgresql
+      - local_postgresql
     volumes:
-      - ${infrastructure_home}/sonarqube/conf:/opt/sonarqube/conf
-      - ${infrastructure_home}/sonarqube/data:/opt/sonarqube/data
-      - ${infrastructure_home}/sonarqube/logs:/opt/sonarqube/logs
-      - ${infrastructure_home}/sonarqube/extensions:/opt/sonarqube/extensions
+      - /Users/kchen/Documents/data/sonarqube/conf:/opt/sonarqube/conf
+      - /Users/kchen/Documents/data/sonarqube/data:/opt/sonarqube/data
+      - /Users/kchen/Documents/data/sonarqube/logs:/opt/sonarqube/logs
+      - /Users/kchen/Documents/data/sonarqube/extensions:/opt/sonarqube/extensions
     environment:
       - sonar.jdbc.url=jdbc:postgresql://local_postgresql:5432/sonar
       - sonar.jdbc.username=sonar
@@ -94,20 +94,23 @@ services:
     restart: always 
 
   local_jenkins:
-    image: jenkins/jenkins:lts
-    container_name: ${instance_prefix}_jenkins
+    # image: jenkins/jenkins:lts
+    image: 10.4.101.92:9084/dockerjenkinslts:0.0.1
+    container_name: local_jenkins
     ports:
       - "50000:50000"
       - "9080:8080"
     volumes:
-      - ${infrastructure_home}/jenkins:/var/jenkins_home
+      - /Users/kchen/Documents/data/jenkins:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./tools/consul-template:/usr/local/bin/consul-template
     environment:
       JAVA_OPTS: "-Djava.awt.headless=true -Dmail.smtp.starttls.enable=true"
     restart: always
 
   local_gitlab:
-    image: 'gitlab/gitlab-ce:latest'
-    container_name: ${instance_prefix}_gitlab
+    image: 'gitlab/gitlab-ce:12.2.0-ce.0'
+    container_name: local_gitlab
     ports:
       - '9082:80'
       - '2022:22'
@@ -120,7 +123,7 @@ services:
         # Fill in the connection details for database.yml
         gitlab_rails['db_adapter'] = 'postgresql'
         gitlab_rails['db_encoding'] = 'utf8'
-        gitlab_rails['db_host'] = '${instance_prefix}_postgresql'
+        gitlab_rails['db_host'] = 'local_postgresql'
         gitlab_rails['db_database'] = 'gitlab'
         gitlab_rails['db_port'] = 5432
         gitlab_rails['db_username'] = 'gitlab'
@@ -129,9 +132,36 @@ services:
         # Add any other gitlab.rb configuration here, each on its own line
     restart: always
     volumes:
-      - ${infrastructure_home}/gitlab/config:/etc/gitlab
-      - ${infrastructure_home}/gitlab/logs:/var/log/gitlab
-      - ${infrastructure_home}/gitlab/data:/var/opt/gitlab
+      - /Users/kchen/Documents/data/gitlab/config:/etc/gitlab
+      - /Users/kchen/Documents/data/gitlab/logs:/var/log/gitlab
+      - /Users/kchen/Documents/data/gitlab/data:/var/opt/gitlab
+
+  consul:
+    image: "consul"
+    hostname: "consul"
+    command: "agent -dev -client 0.0.0.0"
+    ports:
+      - "8400:8400"
+      - "8500:8500"
+      - "8600:53/udp"
+
+  vault:
+    depends_on:
+      - consul
+    image: "vault"
+    hostname: "vault"
+    links:
+      - "consul:consul"
+    environment:
+      VAULT_ADDR: http://127.0.0.1:8200
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./tools/wait-for-it.sh:/wait-for-it.sh:z
+      - ./config/vault:/config:z
+      - ./config/vault/policies:/policies:z
+    entrypoint: /wait-for-it.sh -t 20 -h consul -p 8500 -s -- vault server -config=/config/with-consul.hcl
+
 
 networks:
   infrastructurenet:
