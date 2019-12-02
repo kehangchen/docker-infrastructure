@@ -138,6 +138,7 @@ services:
 
   consul:
     image: "consul"
+    container_name: local_consul
     hostname: "consul"
     command: "agent -dev -client 0.0.0.0"
     ports:
@@ -149,6 +150,7 @@ services:
     depends_on:
       - consul
     image: "vault"
+    container_name: local_vault
     hostname: "vault"
     links:
       - "consul:consul"
